@@ -40,11 +40,10 @@ class Renderer(object):
         self.glViewport(0,0, width, height)
 
     def glViewport(self, x, y, width, height):
-        self.vpX = x
-        self.vpY = y
-        self.vpWidth = width
-        self.vpHeight = height
-
+        self.vpX = int(x)
+        self.vpY = int(y)
+        self.vpWidth = int(width)
+        self.vpHeight = int(height)
 
 
     def glClearColor(self, r, g, b):
@@ -54,6 +53,13 @@ class Renderer(object):
         #Crea una lista 2D de pixeles y a cada valor le asigna 3 bytes de color
         self.pixels = [[ self.clear_color for y in range(self.height)] for x in range(self.width)]
 
+    def glViewportClear(self, color = None):
+        for x in range(self.vpX, self.vpX + self.vpWidth):
+            for y in range(self.vpY, self.vpY + self.vpHeight):
+                self.glPoint(x,y, color)
+
+
+
     def glColor(self, r, g, b):
         self.curr_color = color(r,g,b)
 
@@ -62,7 +68,18 @@ class Renderer(object):
         if x < self.vpX or x >= self.vpX + self.vpWidth or y < self.vpY or y >= self.vpY + self.vpHeight:
             return
 
-        if (0 < x < self.width) and (0 < y < self.height):
+        if (0 <= x < self.width) and (0 <= y < self.height):
+            self.pixels[int(x)][int(y)] = color or self.curr_color
+
+    def glPoint_NDC(self, x, y, color = None):
+        x = int( (x + 1) * (self.vpWidth / 2) + self.vpX )
+        y = int( (y + 1) * (self.vpHeight / 2) + self.vpY)
+
+
+        if x < self.vpX or x >= self.vpX + self.vpWidth or y < self.vpY or y >= self.vpY + self.vpHeight:
+            return
+
+        if (0 <= x < self.width) and (0 <= y < self.height):
             self.pixels[int(x)][int(y)] = color or self.curr_color
 
     def glLine(self, v0, v1, color = None):
@@ -70,6 +87,45 @@ class Renderer(object):
         x1 = v1.x
         y0 = v0.y
         y1 = v1.y
+
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+
+        steep = dy > dx
+
+        if steep:
+            x0, y0 = y0, x0
+            x1, y1 = y1, x1
+
+        if x0 > x1:
+            x0, x1 = x1, x0
+            y0, y1 = y1, y0
+
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+
+        offset = 0
+        limit = 0.5
+        m = dy/dx
+        y = y0
+
+        for x in range(x0, x1 + 1):
+            if steep:
+                self.glPoint(y, x, color)
+            else:
+                self.glPoint(x, y, color)
+
+            offset += m
+            if offset >= limit:
+                y += 1 if y0 < y1 else -1
+                limit += 1
+
+    def glLine_NDC(self, v0, v1, color = None):
+
+        x0 = int( (v0.x + 1) * (self.vpWidth / 2) + self.vpX)
+        x1 = int( (v1.x + 1) * (self.vpWidth / 2) + self.vpX)
+        y0 = int( (v0.y + 1) * (self.vpHeight / 2) + self.vpY)
+        y1 = int( (v1.y + 1) * (self.vpHeight / 2) + self.vpY)
 
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
