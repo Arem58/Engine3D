@@ -1,6 +1,8 @@
 import struct
 from collections import namedtuple
 
+from obj import Obj
+
 V2 = namedtuple('Point2', ['x', 'y'])
 
 
@@ -88,6 +90,10 @@ class Renderer(object):
         y0 = v0.y
         y1 = v1.y
 
+        if x0 == x1 and y0 == y1:
+            self.glPoint(x0,y1,color)
+            return
+
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
 
@@ -158,6 +164,29 @@ class Renderer(object):
             if offset >= limit:
                 y += 1 if y0 < y1 else -1
                 limit += 1
+
+    def glLoadModel(self, filename, translate = V2(0.0,0.0), scale = V2(1.0,1.0)):
+
+        model = Obj(filename)
+
+        for face in model.faces:
+            vertCount = len(face)
+
+            for v in range(vertCount):
+
+                index0 = face[v][0] - 1
+                index1 = face[(v + 1) % vertCount][0] - 1
+
+                vert0 = model.vertices[index0]
+                vert1 = model.vertices[index1]
+
+                x0 = round(vert0[0] * scale.x + translate.x)
+                y0 = round(vert0[1] * scale.y + translate.y)
+                x1 = round(vert1[0] * scale.x + translate.x)
+                y1 = round(vert1[1] * scale.y + translate.y)
+
+                self.glLine(V2(x0,y0), V2(x1, y1))
+
 
     def glFinish(self, filename):
         #Crea un archivo BMP y lo llena con la información dentro de self.pixels
