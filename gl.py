@@ -3,6 +3,8 @@ from collections import namedtuple
 
 from obj import Obj
 
+import random
+
 V2 = namedtuple('Point2', ['x', 'y'])
 
 
@@ -35,6 +37,34 @@ class Renderer(object):
         self.clear_color = BLACK
         self.glCreateWindow(width, height)
 
+    def glFinish(self, filename):
+        #Crea un archivo BMP y lo llena con la información dentro de self.pixels
+        with open(filename, "wb") as file:
+            # Header
+            file.write(bytes('B'.encode('ascii')))
+            file.write(bytes('M'.encode('ascii')))
+            file.write(dword(14 + 40 + (self.width * self.height * 3)))
+            file.write(dword(0))
+            file.write(dword(14 + 40))
+
+            # InfoHeader
+            file.write(dword(40))
+            file.write(dword(self.width))
+            file.write(dword(self.height))
+            file.write(word(1))
+            file.write(word(24))
+            file.write(dword(0))
+            file.write(dword(self.width * self.height * 3))
+            file.write(dword(0))
+            file.write(dword(0))
+            file.write(dword(0))
+            file.write(dword(0))
+
+            # Color Table
+            for y in range(self.height):
+                for x in range(self.width):
+                    file.write(self.pixels[x][y])
+
     def glCreateWindow(self, width, height):
         self.width = width
         self.height = height
@@ -46,7 +76,6 @@ class Renderer(object):
         self.vpY = int(y)
         self.vpWidth = int(width)
         self.vpHeight = int(height)
-
 
     def glClearColor(self, r, g, b):
         self.clear_color = color(r, g, b)
@@ -60,11 +89,8 @@ class Renderer(object):
             for y in range(self.vpY, self.vpY + self.vpHeight):
                 self.glPoint(x,y, color)
 
-
-
     def glColor(self, r, g, b):
         self.curr_color = color(r,g,b)
-
 
     def glPoint(self, x, y, color = None):
         if x < self.vpX or x >= self.vpX + self.vpWidth or y < self.vpY or y >= self.vpY + self.vpHeight:
@@ -172,49 +198,79 @@ class Renderer(object):
         for face in model.faces:
             vertCount = len(face)
 
-            for v in range(vertCount):
-
-                index0 = face[v][0] - 1
-                index1 = face[(v + 1) % vertCount][0] - 1
+            if vertCount == 3:
+                index0 = face[0][0] - 1
+                index1 = face[1][0] - 1
+                index2 = face[2][0] - 1
 
                 vert0 = model.vertices[index0]
                 vert1 = model.vertices[index1]
+                vert2 = model.vertices[index2]
 
-                x0 = round(vert0[0] * scale.x + translate.x)
-                y0 = round(vert0[1] * scale.y + translate.y)
-                x1 = round(vert1[0] * scale.x + translate.x)
-                y1 = round(vert1[1] * scale.y + translate.y)
+                a = V2(int(vert0[0] * scale.x + translate.x), int(vert0[1] * scale.y + translate.y) )
+                b = V2(int(vert1[0] * scale.x + translate.x), int(vert1[1] * scale.y + translate.y) )
+                c = V2(int(vert2[0] * scale.x + translate.x), int(vert2[1] * scale.y + translate.y) )
 
-                self.glLine(V2(x0,y0), V2(x1, y1))
+                self.glTriangle(a, b, c, color(random.random(), random.random(), random.random()))
+
+    def glTriangle(self, A, B, C, color = None):
+
+        if A.y < B.y:
+            A, B = B, A
+        if A.y < C.y:
+            A, C = C, A
+        if B.y < C.y:
+            B, C = C, B
+
+        def flatBottomTriangle(v1, v2, v3):
+            try:
+                d_21 = (v2.x - v1.x) / (v2.y - v1.y)
+                d_31 = (v3.x - v1.x) / (v3.y - v1.y)
+            except:
+                pass
+            else:
+                x1 = v2.x
+                x2 = v3.x
+                for y in range(v2.y, v1.y + 1):
+                    self.glLine(V2(int(x1),y), V2(int(x2),y), color)
+                    x1 += d_21
+                    x2 += d_31
+
+        def flatTopTriangle(v1, v2, v3):
+            try:
+                d_31 = (v3.x - v1.x) / (v3.y - v1.y)
+                d_32 = (v3.x - v2.x) / (v3.y - v2.y)
+            except:
+                pass
+            else:
+                x1 = v3.x
+                x2 = v3.x
+
+                for y in range(v3.y, v1.y + 1):
+                    self.glLine(V2(int(x1),y), V2(int(x2),y), color)
+                    x1 += d_31
+                    x2 += d_32
+
+        if B.y == C.y:
+            # triangulo con base inferior plana
+            flatBottomTriangle(A, B, C)
+        elif A.y == B.y:
+            # triangulo con base superior plana
+            flatTopTriangle(A, B, C)
+        else:
+            # dividir el triangulo en dos
+            # dibujar ambos casos
+            # Teorema de intercepto
+            D = V2(A.x + ((B.y - A.y) / (C.y - A.y)) * (C.x - A.x)   , B.y)
+            flatBottomTriangle(A, B, D)
+            flatTopTriangle(B, D, C)
 
 
-    def glFinish(self, filename):
-        #Crea un archivo BMP y lo llena con la información dentro de self.pixels
-        with open(filename, "wb") as file:
-            # Header
-            file.write(bytes('B'.encode('ascii')))
-            file.write(bytes('M'.encode('ascii')))
-            file.write(dword(14 + 40 + (self.width * self.height * 3)))
-            file.write(dword(0))
-            file.write(dword(14 + 40))
 
-            # InfoHeader
-            file.write(dword(40))
-            file.write(dword(self.width))
-            file.write(dword(self.height))
-            file.write(word(1))
-            file.write(word(24))
-            file.write(dword(0))
-            file.write(dword(self.width * self.height * 3))
-            file.write(dword(0))
-            file.write(dword(0))
-            file.write(dword(0))
-            file.write(dword(0))
 
-            # Color Table
-            for y in range(self.height):
-                for x in range(self.width):
-                    file.write(self.pixels[x][y])
+
+
+
 
 
 
